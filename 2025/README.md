@@ -1,5 +1,7 @@
 # Using AppleScript for Advent of Code: 2025
 
+[Advent of Code 2025](https://adventofcode.com/2025) 
+
 I like to solve Advent of Code with some obscure language each year - and this year I thought of several options including 68000 assembly language (I think I'm a bit too rusty for all but the simplest puzzles) and HyperTalk. For a while, HyperTalk (the programming language used by HyperCard) was the most appealling option, but the thought of the length of time required for a vintage Mac to crunch its way through an Advent of Code puzzle put me off the idea. Which only left one obscure option in my mind…
 
 AppleScript. AppleScript is a close relation to HyperTalk, and is designed to script all applications on MacOS. It's the most powerful desktop operating system automation language that I can think of - but it is neither designed for, nor very good at, heavy data manipulation. So let's see how we get on.
