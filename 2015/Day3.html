@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 3: Perfectly Spherical Houses in a Vacuum</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 3</h1>
+    <h2>Perfectly Spherical Houses in a Vacuum</h2>
+    
+    <p class="instructions">Select your puzzle input file to calculate houses receiving presents.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 3: Perfectly Spherical Houses in a Vacuum
+     * 
+     * Part 1: Count unique houses visited by Santa alone.
+     * Part 2: Count unique houses visited by Santa and Robo-Santa taking turns.
+     * 
+     * Performance: Uses Sets for O(1) coordinate tracking.
+     */
+
+    const DIRECTIONS = {
+        '^': { dx: 0, dy: -1 },
+        'v': { dx: 0, dy: 1 },
+        '>': { dx: 1, dy: 0 },
+        '<': { dx: -1, dy: 0 }
+    };
+
+    function countHousesSoloSanta(directions) {
+        const visited = new Set();
+        let x = 0, y = 0;
+        visited.add('0,0');
+        
+        for (let i = 0; i < directions.length; i++) {
+            const delta = DIRECTIONS[directions[i]];
+            if (!delta) continue;
+            x += delta.dx;
+            y += delta.dy;
+            visited.add(x + ',' + y);
+        }
+        return visited.size;
+    }
+
+    function countHousesWithRoboSanta(directions) {
+        const visited = new Set();
+        let santaX = 0, santaY = 0;
+        let roboX = 0, roboY = 0;
+        let santaTurn = true;
+        
+        visited.add('0,0');
+        
+        for (let i = 0; i < directions.length; i++) {
+            const delta = DIRECTIONS[directions[i]];
+            if (!delta) continue;
+            
+            if (santaTurn) {
+                santaX += delta.dx;
+                santaY += delta.dy;
+                visited.add(santaX + ',' + santaY);
+            } else {
+                roboX += delta.dx;
+                roboY += delta.dy;
+                visited.add(roboX + ',' + roboY);
+            }
+            santaTurn = !santaTurn;
+        }
+        return visited.size;
+    }
+
+    function solve(input) {
+        const directions = input.trim();
+        const moveCount = (directions.match(/[\^v<>]/g) || []).length;
+        
+        return {
+            part1: countHousesSoloSanta(directions),
+            part2: countHousesWithRoboSanta(directions),
+            moveCount: moveCount
+        };
+    }
+
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Santa alone</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span> houses' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Santa + Robo-Santa</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span> houses' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Processed ' + result.moveCount.toLocaleString() + 
+                    ' moves in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
