@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 5: Doesn't He Have Intern-Elves For This?</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 5</h1>
+    <h2>Doesn't He Have Intern-Elves For This?</h2>
+    
+    <p class="instructions">Select your puzzle input file to determine which strings are nice.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 5: Doesn't He Have Intern-Elves For This?
+     * 
+     * Part 1: Count "nice" strings that have:
+     *   - At least 3 vowels (aeiou)
+     *   - At least one double letter (aa, bb, etc.)
+     *   - None of the forbidden substrings: ab, cd, pq, xy
+     * 
+     * Part 2: Count "nice" strings with NEW rules:
+     *   - A pair of two letters appearing at least twice without overlapping
+     *   - At least one letter repeating with exactly one letter between (xyx pattern)
+     */
+
+    /**
+     * Checks if a string is "nice" according to Part 1 rules.
+     * 
+     * @param {string} str - The string to check
+     * @returns {boolean} True if the string is nice
+     */
+    function isNicePart1(str) {
+        // Rule 3: Check for forbidden substrings first (quick rejection)
+        if (str.includes('ab') || str.includes('cd') || 
+            str.includes('pq') || str.includes('xy')) {
+            return false;
+        }
+        
+        // Rule 1: Count vowels (need at least 3)
+        let vowelCount = 0;
+        const vowels = 'aeiou';
+        for (let i = 0; i < str.length; i++) {
+            if (vowels.includes(str[i])) {
+                vowelCount++;
+            }
+        }
+        if (vowelCount < 3) {
+            return false;
+        }
+        
+        // Rule 2: Check for double letter
+        for (let i = 0; i < str.length - 1; i++) {
+            if (str[i] === str[i + 1]) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Checks if a string is "nice" according to Part 2 rules.
+     * 
+     * @param {string} str - The string to check
+     * @returns {boolean} True if the string is nice
+     */
+    function isNicePart2(str) {
+        // Rule 1: Pair of two letters appearing at least twice without overlapping
+        // Use a Map to store the first occurrence index of each pair
+        let hasPair = false;
+        const pairFirstIndex = new Map();
+        
+        for (let i = 0; i < str.length - 1; i++) {
+            const pair = str[i] + str[i + 1];
+            
+            if (pairFirstIndex.has(pair)) {
+                // Check that they don't overlap (indices must differ by at least 2)
+                if (i - pairFirstIndex.get(pair) >= 2) {
+                    hasPair = true;
+                    break;
+                }
+                // If overlapping, don't update the first index (keep earliest)
+            } else {
+                pairFirstIndex.set(pair, i);
+            }
+        }
+        
+        if (!hasPair) {
+            return false;
+        }
+        
+        // Rule 2: Letter that repeats with exactly one letter between (xyx pattern)
+        for (let i = 0; i < str.length - 2; i++) {
+            if (str[i] === str[i + 2]) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Parses input and counts nice strings for both parts.
+     * 
+     * @param {string} input - The puzzle input (one string per line)
+     * @returns {Object} Results containing nice counts for both parts
+     */
+    function solve(input) {
+        const lines = input.trim().split('\n');
+        let niceCount1 = 0;
+        let niceCount2 = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                if (isNicePart1(line)) niceCount1++;
+                if (isNicePart2(line)) niceCount2++;
+            }
+        }
+        
+        return {
+            part1: niceCount1,
+            part2: niceCount2,
+            totalStrings: lines.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Nice strings (old rules)</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Nice strings (new rules)</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Checked ' + result.totalStrings.toLocaleString() + 
+                    ' strings in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
