@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 8: Matchsticks</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 8</h1>
+    <h2>Matchsticks</h2>
+    
+    <p class="instructions">Select your puzzle input file to analyze string literals.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 8: Matchsticks
+     * 
+     * Part 1: Calculate (code characters) - (in-memory characters)
+     *   - Decode escape sequences: \\, \", \xNN
+     * 
+     * Part 2: Calculate (encoded characters) - (code characters)
+     *   - Encode by escaping \ and " and adding surrounding quotes
+     */
+
+    /**
+     * Counts the in-memory length of a string literal (decoding).
+     * The string includes the surrounding quotes.
+     * 
+     * @param {string} str - The string literal (e.g., "abc" or "a\\b")
+     * @returns {number} The number of characters when decoded
+     */
+    function countMemoryChars(str) {
+        // Remove surrounding quotes
+        const inner = str.slice(1, -1);
+        let count = 0;
+        let i = 0;
+        
+        while (i < inner.length) {
+            if (inner[i] === '\\') {
+                // Escape sequence
+                if (inner[i + 1] === '\\' || inner[i + 1] === '"') {
+                    // \\ or \" -> 1 character
+                    count++;
+                    i += 2;
+                } else if (inner[i + 1] === 'x') {
+                    // \xNN -> 1 character (hex escape)
+                    count++;
+                    i += 4;  // Skip \xNN
+                } else {
+                    // Unknown escape, treat as single char
+                    count++;
+                    i++;
+                }
+            } else {
+                // Regular character
+                count++;
+                i++;
+            }
+        }
+        
+        return count;
+    }
+
+    /**
+     * Counts the encoded length of a string literal.
+     * We need to escape \ and " and add surrounding quotes.
+     * 
+     * @param {string} str - The original string literal
+     * @returns {number} The number of characters when encoded
+     */
+    function countEncodedChars(str) {
+        // Start with 2 for the new surrounding quotes
+        let count = 2;
+        
+        // Process each character in the original string
+        for (let i = 0; i < str.length; i++) {
+            const c = str[i];
+            if (c === '\\' || c === '"') {
+                // These need to be escaped -> 2 characters each
+                count += 2;
+            } else {
+                // Regular character -> 1 character
+                count++;
+            }
+        }
+        
+        return count;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const lines = input.trim().split('\n');
+        let totalCode = 0;
+        let totalMemory = 0;
+        let totalEncoded = 0;
+        let lineCount = 0;
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            const codeChars = trimmed.length;
+            const memoryChars = countMemoryChars(trimmed);
+            const encodedChars = countEncodedChars(trimmed);
+            
+            totalCode += codeChars;
+            totalMemory += memoryChars;
+            totalEncoded += encodedChars;
+            lineCount++;
+        }
+        
+        return {
+            part1: totalCode - totalMemory,
+            part2: totalEncoded - totalCode,
+            totalCode: totalCode,
+            totalMemory: totalMemory,
+            totalEncoded: totalEncoded,
+            lineCount: lineCount
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Code - Memory</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Encoded - Code</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Analyzed ' + result.lineCount.toLocaleString() + 
+                    ' strings (memory: ' + result.totalMemory.toLocaleString() + 
+                    ', code: ' + result.totalCode.toLocaleString() + 
+                    ', encoded: ' + result.totalEncoded.toLocaleString() + ') in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

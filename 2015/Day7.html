@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 7: Some Assembly Required</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 7</h1>
+    <h2>Some Assembly Required</h2>
+    
+    <p class="instructions">Select your puzzle input file to emulate the circuit.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 7: Some Assembly Required
+     * 
+     * Part 1: Emulate a circuit of wires and bitwise logic gates.
+     *         Find the signal on wire 'a'.
+     * 
+     * Part 2: Override wire 'b' with Part 1's result, reset all wires,
+     *         and find the new signal on wire 'a'.
+     * 
+     * Approach: Parse instructions into a dependency graph, then recursively
+     * evaluate with memoisation to handle dependencies in any order.
+     */
+
+    const MASK_16BIT = 0xFFFF;  // 65535 - ensures 16-bit values
+
+    /**
+     * Parses an instruction line into a structured object.
+     * 
+     * @param {string} line - Instruction like "x AND y -> z"
+     * @returns {Object|null} Parsed instruction
+     */
+    function parseInstruction(line) {
+        line = line.trim();
+        if (!line) return null;
+
+        // All instructions end with "-> wire"
+        const arrowMatch = line.match(/^(.+) -> ([a-z]+)$/);
+        if (!arrowMatch) return null;
+
+        const expr = arrowMatch[1].trim();
+        const target = arrowMatch[2];
+
+        // Direct assignment: "123 -> x" or "y -> x"
+        if (/^[a-z]+$/.test(expr)) {
+            return { type: 'WIRE', target, source: expr };
+        }
+        if (/^\d+$/.test(expr)) {
+            return { type: 'VALUE', target, value: parseInt(expr, 10) };
+        }
+
+        // NOT gate: "NOT x -> y"
+        const notMatch = expr.match(/^NOT ([a-z]+|\d+)$/);
+        if (notMatch) {
+            return { type: 'NOT', target, a: notMatch[1] };
+        }
+
+        // Binary operations: "x AND y -> z", "x LSHIFT 2 -> z", etc.
+        const binaryMatch = expr.match(/^([a-z]+|\d+) (AND|OR|LSHIFT|RSHIFT) ([a-z]+|\d+)$/);
+        if (binaryMatch) {
+            return {
+                type: binaryMatch[2],
+                target,
+                a: binaryMatch[1],
+                b: binaryMatch[3]
+            };
+        }
+
+        return null;
+    }
+
+    /**
+     * Gets the value of an operand (either a wire reference or a literal number).
+     * 
+     * @param {string} operand - Wire name or number string
+     * @param {Map} wires - Map of wire values
+     * @param {Map} instructions - Map of wire -> instruction
+     * @param {function} evaluate - Evaluation function for recursive lookup
+     * @returns {number} The value
+     */
+    function getOperandValue(operand, wires, instructions, evaluate) {
+        // Check if it's a number literal
+        if (/^\d+$/.test(operand)) {
+            return parseInt(operand, 10);
+        }
+        // Otherwise it's a wire reference
+        return evaluate(operand, wires, instructions);
+    }
+
+    /**
+     * Evaluates a wire's signal, recursively resolving dependencies.
+     * Uses memoisation to avoid recomputing values.
+     * 
+     * @param {string} wire - The wire to evaluate
+     * @param {Map} wires - Memoisation cache of computed wire values
+     * @param {Map} instructions - Map of wire -> instruction
+     * @returns {number} The wire's signal value
+     */
+    function evaluate(wire, wires, instructions) {
+        // Check if already computed
+        if (wires.has(wire)) {
+            return wires.get(wire);
+        }
+
+        const instr = instructions.get(wire);
+        if (!instr) {
+            throw new Error(`No instruction found for wire: ${wire}`);
+        }
+
+        let result;
+
+        switch (instr.type) {
+            case 'VALUE':
+                result = instr.value;
+                break;
+
+            case 'WIRE':
+                result = evaluate(instr.source, wires, instructions);
+                break;
+
+            case 'NOT': {
+                const a = getOperandValue(instr.a, wires, instructions, evaluate);
+                result = (~a) & MASK_16BIT;
+                break;
+            }
+
+            case 'AND': {
+                const a = getOperandValue(instr.a, wires, instructions, evaluate);
+                const b = getOperandValue(instr.b, wires, instructions, evaluate);
+                result = (a & b) & MASK_16BIT;
+                break;
+            }
+
+            case 'OR': {
+                const a = getOperandValue(instr.a, wires, instructions, evaluate);
+                const b = getOperandValue(instr.b, wires, instructions, evaluate);
+                result = (a | b) & MASK_16BIT;
+                break;
+            }
+
+            case 'LSHIFT': {
+                const a = getOperandValue(instr.a, wires, instructions, evaluate);
+                const b = getOperandValue(instr.b, wires, instructions, evaluate);
+                result = (a << b) & MASK_16BIT;
+                break;
+            }
+
+            case 'RSHIFT': {
+                const a = getOperandValue(instr.a, wires, instructions, evaluate);
+                const b = getOperandValue(instr.b, wires, instructions, evaluate);
+                result = (a >>> b) & MASK_16BIT;
+                break;
+            }
+
+            default:
+                throw new Error(`Unknown instruction type: ${instr.type}`);
+        }
+
+        // Memoise the result
+        wires.set(wire, result);
+        return result;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const lines = input.trim().split('\n');
+        const instructions = new Map();
+
+        // Parse all instructions
+        for (const line of lines) {
+            const instr = parseInstruction(line);
+            if (instr) {
+                instructions.set(instr.target, instr);
+            }
+        }
+
+        // Part 1: Evaluate wire 'a'
+        const wires1 = new Map();
+        const part1 = evaluate('a', wires1, instructions);
+
+        // Part 2: Override wire 'b' with Part 1's result, reset and re-evaluate
+        instructions.set('b', { type: 'VALUE', target: 'b', value: part1 });
+        const wires2 = new Map();  // Fresh cache (reset all wires)
+        const part2 = evaluate('a', wires2, instructions);
+
+        return {
+            part1: part1,
+            part2: part2,
+            instructionCount: instructions.size
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Signal on wire a</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Signal on wire a (after override)</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Processed ' + result.instructionCount.toLocaleString() + 
+                    ' instructions in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

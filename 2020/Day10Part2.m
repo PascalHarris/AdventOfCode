@@ -12,40 +12,29 @@ NSArray* loadData() {
 }
 
 int main(int argc, char *argv[]) {
-	@autoreleasepool {
-		NSArray* joltageArray = [NSArray.alloc initWithArray:loadData()];
-/*		int jd1 = 0, jd3 = 0;
-		for (int i = 1; i < joltageArray.count; i++) {
-			if ([joltageArray[i] intValue] - [joltageArray[i-1] intValue] == 1) { 
-				jd1++; 
-			} else if ([joltageArray[i] intValue] - [joltageArray[i-1] intValue] == 3) { 
-				jd3++; 
-			}
-		}
-		NSLog(@"%d",jd1*(++jd3));*/
-		NSMutableDictionary* solutionDictionary = NSMutableDictionary.new;
-		//for (NSUInteger i = 0; i < 156; i++) {
-		//	[solutionArray addObject:@(0)];
-		//}
-		solutionDictionary[@(0)] = @(1);
-		for (NSNumber* joltage in joltageArray) {
-			solutionDictionary[joltage] = @(0);
-			//NSLog(@"a");
-			//int result = [solutionArray[joltage.intValue] intValue];
-			if ([solutionDictionary.allKeys containsObject:@(joltage.intValue - 1)]) {
-				solutionDictionary[joltage] = @([solutionDictionary[joltage] intValue] + [solutionDictionary[@(joltage.intValue-1)] intValue]);
-			}
-			if ([solutionDictionary.allKeys containsObject:@(joltage.intValue - 2)]) {
-				solutionDictionary[joltage] = @([solutionDictionary[joltage] intValue] + [solutionDictionary[@(joltage.intValue-2)] intValue]);
-			}
-			if ([solutionDictionary.allKeys containsObject:@(joltage.intValue - 3)]) {
-				solutionDictionary[joltage] = @([solutionDictionary[joltage] intValue] + [solutionDictionary[@(joltage.intValue-3)] intValue]);
-			}
-			/*if ([solutionArray containsObject:@(joltage.intValue - 1)]) { solutionArray[joltage.intValue] = @([solutionArray[joltage.intValue] intValue] + [solutionArray[joltage.intValue-1] intValue]); }
-			if ([solutionArray containsObject:@(joltage.intValue - 2)]) { solutionArray[joltage.intValue] = @([solutionArray[joltage.intValue] intValue] + [solutionArray[joltage.intValue-2] intValue]); }
-			if ([solutionArray containsObject:@(joltage.intValue - 3)]) { solutionArray[joltage.intValue] = @([solutionArray[joltage.intValue] intValue] + [solutionArray[joltage.intValue-3] intValue]); }*/
-//			solutionArray[joltage.intValue] = @(result); 
-		}
-		NSLog(@"%@",solutionDictionary);
-	}
+    @autoreleasepool {
+        NSArray* joltageArray = loadData();
+        NSMutableDictionary* solutionDictionary = NSMutableDictionary.new;
+        solutionDictionary[@(0)] = @(1);  // Base case: 1 way to be at the outlet
+        
+        for (NSNumber* joltage in joltageArray) {
+            if (joltage.intValue == 0) continue;  // Skip 0, we already set it
+            
+            long long count = 0;
+            if (solutionDictionary[@(joltage.intValue - 1)]) {
+                count += [solutionDictionary[@(joltage.intValue - 1)] longLongValue];
+            }
+            if (solutionDictionary[@(joltage.intValue - 2)]) {
+                count += [solutionDictionary[@(joltage.intValue - 2)] longLongValue];
+            }
+            if (solutionDictionary[@(joltage.intValue - 3)]) {
+                count += [solutionDictionary[@(joltage.intValue - 3)] longLongValue];
+            }
+            solutionDictionary[joltage] = @(count);
+        }
+        
+        // Get the answer for the highest joltage adapter
+        NSNumber* maxJoltage = [joltageArray lastObject];
+        NSLog(@"%lld", [solutionDictionary[maxJoltage] longLongValue]);
+    }
 }

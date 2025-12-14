@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 9: All in a Single Night</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 9</h1>
+    <h2>All in a Single Night</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the shortest and longest routes.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 9: All in a Single Night
+     * 
+     * Part 1: Find the shortest route visiting all locations exactly once.
+     * Part 2: Find the longest route visiting all locations exactly once.
+     * 
+     * Approach: Brute-force all permutations (small input size makes this feasible).
+     */
+
+    /**
+     * Parses the input into a distance map.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} { locations: Array, distances: Map }
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const locations = new Set();
+        const distances = new Map();
+        
+        for (const line of lines) {
+            const match = line.match(/^(\w+) to (\w+) = (\d+)$/);
+            if (!match) continue;
+            
+            const [, from, to, dist] = match;
+            const distance = parseInt(dist, 10);
+            
+            locations.add(from);
+            locations.add(to);
+            
+            // Store both directions (distances are symmetric)
+            const key1 = from + '|' + to;
+            const key2 = to + '|' + from;
+            distances.set(key1, distance);
+            distances.set(key2, distance);
+        }
+        
+        return { locations: Array.from(locations), distances };
+    }
+
+    /**
+     * Calculates the total distance of a route.
+     * 
+     * @param {Array} route - Array of location names in order
+     * @param {Map} distances - Map of location pairs to distances
+     * @returns {number} Total distance
+     */
+    function calculateRouteDistance(route, distances) {
+        let total = 0;
+        for (let i = 0; i < route.length - 1; i++) {
+            const key = route[i] + '|' + route[i + 1];
+            total += distances.get(key);
+        }
+        return total;
+    }
+
+    /**
+     * Generates all permutations of an array using Heap's algorithm.
+     * 
+     * @param {Array} arr - The array to permute
+     * @returns {Array} Array of all permutations
+     */
+    function permutations(arr) {
+        const result = [];
+        const c = new Array(arr.length).fill(0);
+        
+        result.push([...arr]);
+        
+        let i = 0;
+        while (i < arr.length) {
+            if (c[i] < i) {
+                if (i % 2 === 0) {
+                    [arr[0], arr[i]] = [arr[i], arr[0]];
+                } else {
+                    [arr[c[i]], arr[i]] = [arr[i], arr[c[i]]];
+                }
+                result.push([...arr]);
+                c[i]++;
+                i = 0;
+            } else {
+                c[i] = 0;
+                i++;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const { locations, distances } = parseInput(input);
+        
+        // Generate all permutations of locations
+        const allRoutes = permutations(locations);
+        
+        let shortestDistance = Infinity;
+        let longestDistance = 0;
+        
+        for (const route of allRoutes) {
+            const distance = calculateRouteDistance(route, distances);
+            
+            if (distance < shortestDistance) {
+                shortestDistance = distance;
+            }
+            if (distance > longestDistance) {
+                longestDistance = distance;
+            }
+        }
+        
+        return {
+            part1: shortestDistance,
+            part2: longestDistance,
+            locationCount: locations.length,
+            routesChecked: allRoutes.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Shortest route</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Longest route</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Checked ' + result.routesChecked.toLocaleString() + 
+                    ' routes through ' + result.locationCount + ' locations in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
