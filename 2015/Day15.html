@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 15: Science for Hungry People</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 15</h1>
+    <h2>Science for Hungry People</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the perfect cookie recipe.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 15: Science for Hungry People
+     * 
+     * Part 1: Find the highest-scoring cookie using exactly 100 teaspoons.
+     * Part 2: Find the highest-scoring cookie with exactly 500 calories.
+     */
+
+    const TOTAL_TEASPOONS = 100;
+    const TARGET_CALORIES = 500;
+
+    /**
+     * Parses the input into ingredient data.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Array} Array of ingredient objects
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const ingredients = [];
+        
+        for (const line of lines) {
+            const match = line.match(/^(\w+): capacity (-?\d+), durability (-?\d+), flavor (-?\d+), texture (-?\d+), calories (-?\d+)$/);
+            if (!match) continue;
+            
+            const [, name, capacity, durability, flavor, texture, calories] = match;
+            ingredients.push({
+                name: name,
+                capacity: parseInt(capacity, 10),
+                durability: parseInt(durability, 10),
+                flavor: parseInt(flavor, 10),
+                texture: parseInt(texture, 10),
+                calories: parseInt(calories, 10)
+            });
+        }
+        
+        return ingredients;
+    }
+
+    /**
+     * Calculates the score for a given combination of ingredient amounts.
+     * 
+     * @param {Array} ingredients - Array of ingredient objects
+     * @param {Array} amounts - Array of amounts for each ingredient
+     * @returns {number} The cookie score
+     */
+    function calculateScore(ingredients, amounts) {
+        let capacity = 0, durability = 0, flavor = 0, texture = 0;
+        
+        for (let i = 0; i < ingredients.length; i++) {
+            const ing = ingredients[i];
+            const amt = amounts[i];
+            
+            capacity += ing.capacity * amt;
+            durability += ing.durability * amt;
+            flavor += ing.flavor * amt;
+            texture += ing.texture * amt;
+        }
+        
+        // Negative totals become 0
+        capacity = Math.max(0, capacity);
+        durability = Math.max(0, durability);
+        flavor = Math.max(0, flavor);
+        texture = Math.max(0, texture);
+        
+        return capacity * durability * flavor * texture;
+    }
+
+    /**
+     * Calculates the total calories for a given combination.
+     * 
+     * @param {Array} ingredients - Array of ingredient objects
+     * @param {Array} amounts - Array of amounts for each ingredient
+     * @returns {number} Total calories
+     */
+    function calculateCalories(ingredients, amounts) {
+        let calories = 0;
+        for (let i = 0; i < ingredients.length; i++) {
+            calories += ingredients[i].calories * amounts[i];
+        }
+        return calories;
+    }
+
+    /**
+     * Generates all combinations of n non-negative integers that sum to total.
+     * 
+     * @param {number} n - Number of values
+     * @param {number} total - Required sum
+     * @param {function} callback - Called with each valid combination
+     */
+    function generateCombinations(n, total, callback) {
+        const amounts = new Array(n).fill(0);
+        
+        function generate(index, remaining) {
+            if (index === n - 1) {
+                amounts[index] = remaining;
+                callback(amounts);
+                return;
+            }
+            
+            for (let amt = 0; amt <= remaining; amt++) {
+                amounts[index] = amt;
+                generate(index + 1, remaining - amt);
+            }
+        }
+        
+        generate(0, total);
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const ingredients = parseInput(input);
+        
+        let maxScore = 0;
+        let maxScoreWith500Cal = 0;
+        let combinationsChecked = 0;
+        
+        generateCombinations(ingredients.length, TOTAL_TEASPOONS, (amounts) => {
+            const score = calculateScore(ingredients, amounts);
+            const calories = calculateCalories(ingredients, amounts);
+            
+            // Part 1: Best score overall
+            if (score > maxScore) {
+                maxScore = score;
+            }
+            
+            // Part 2: Best score with exactly 500 calories
+            if (calories === TARGET_CALORIES && score > maxScoreWith500Cal) {
+                maxScoreWith500Cal = score;
+            }
+            
+            combinationsChecked++;
+        });
+        
+        return {
+            part1: maxScore,
+            part2: maxScoreWith500Cal,
+            ingredientCount: ingredients.length,
+            combinationsChecked: combinationsChecked
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Highest cookie score</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Highest score with 500 calories</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Checked ' + result.combinationsChecked.toLocaleString() + 
+                    ' combinations of ' + result.ingredientCount + ' ingredients in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

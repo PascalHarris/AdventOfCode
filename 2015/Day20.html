@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 20: Infinite Elves and Infinite Houses</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .input-section {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            width: 200px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00cc00;
+        }
+        button {
+            background: #10101a;
+            color: #00cc00;
+            padding: 10px 20px;
+            border: 1px solid #00cc00;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #00cc00;
+            color: #0f0f23;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+        .progress {
+            color: #009900;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 20</h1>
+    <h2>Infinite Elves and Infinite Houses</h2>
+    
+    <p class="instructions">Enter your puzzle input (target presents).</p>
+    
+    <div class="input-section">
+        <input type="text" id="puzzleInput" value="36000000" placeholder="Target presents">
+        <button id="runBtn" onclick="runSolution()">Find House</button>
+    </div>
+    
+    <div id="progress" class="progress"></div>
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 20: Infinite Elves and Infinite Houses
+     * 
+     * Part 1: Find lowest house with target presents.
+     *         Each elf visits all multiples, delivers 10× their number.
+     * 
+     * Part 2: Each elf visits only 50 houses, delivers 11× their number.
+     */
+
+    let running = false;
+
+    /**
+     * Part 1: Finds house where each elf visits infinite houses, 10× presents.
+     * 
+     * @param {number} targetPresents - Target presents
+     * @param {number} limit - Search limit
+     * @returns {number} Lowest house number, or -1
+     */
+    function findHousePart1(targetPresents, limit) {
+        const presents = new Uint32Array(limit + 1);
+        
+        for (let elf = 1; elf <= limit; elf++) {
+            for (let house = elf; house <= limit; house += elf) {
+                presents[house] += elf * 10;
+            }
+        }
+        
+        for (let house = 1; house <= limit; house++) {
+            if (presents[house] >= targetPresents) {
+                return house;
+            }
+        }
+        
+        return -1;
+    }
+
+    /**
+     * Part 2: Finds house where each elf visits only 50 houses, 11× presents.
+     * 
+     * @param {number} targetPresents - Target presents
+     * @param {number} limit - Search limit
+     * @returns {number} Lowest house number, or -1
+     */
+    function findHousePart2(targetPresents, limit) {
+        const presents = new Uint32Array(limit + 1);
+        const maxVisits = 50;
+        
+        for (let elf = 1; elf <= limit; elf++) {
+            // Each elf visits at most 50 houses
+            let visits = 0;
+            for (let house = elf; house <= limit && visits < maxVisits; house += elf) {
+                presents[house] += elf * 11;
+                visits++;
+            }
+        }
+        
+        for (let house = 1; house <= limit; house++) {
+            if (presents[house] >= targetPresents) {
+                return house;
+            }
+        }
+        
+        return -1;
+    }
+
+    /**
+     * Runs the solution.
+     */
+    function runSolution() {
+        const input = document.getElementById('puzzleInput').value.trim();
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+        const progressEl = document.getElementById('progress');
+        const runBtn = document.getElementById('runBtn');
+
+        const targetPresents = parseInt(input, 10);
+        if (isNaN(targetPresents) || targetPresents <= 0) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Please enter a valid positive number.</span>';
+            return;
+        }
+
+        if (running) return;
+        running = true;
+        runBtn.disabled = true;
+        resultEl.style.display = 'none';
+        statsEl.innerHTML = '';
+        progressEl.innerHTML = '🏠 Computing Part 1...';
+
+        const startTime = performance.now();
+        const limit = Math.floor(targetPresents / 10);
+
+        // Use setTimeout to allow UI to update between parts
+        setTimeout(function() {
+            const part1 = findHousePart1(targetPresents, limit);
+            
+            progressEl.innerHTML = '🏠 Computing Part 2...';
+            
+            setTimeout(function() {
+                const part2 = findHousePart2(targetPresents, limit);
+                
+                const endTime = performance.now();
+                
+                running = false;
+                runBtn.disabled = false;
+                progressEl.innerHTML = '';
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Lowest house (infinite visits, 10×)</div>' +
+                        '<span class="answer">' + (part1 > 0 ? part1.toLocaleString() : 'Not found') + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Lowest house (50 visits, 11×)</div>' +
+                        '<span class="answer">' + (part2 > 0 ? part2.toLocaleString() : 'Not found') + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Computed in ' + 
+                    ((endTime - startTime) / 1000).toFixed(2) + 's';
+            }, 50);
+        }, 50);
+    }
+
+    // Allow Enter key to run
+    document.getElementById('puzzleInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') runSolution();
+    });
+    </script>
+</body>
+</html>

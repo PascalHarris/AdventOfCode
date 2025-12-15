@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 25: Let It Snow</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 25</h1>
+    <h2>Let It Snow</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the code.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 25: Let It Snow
+     * 
+     * Part 1: Find the code at a specific row and column on the infinite diagonal grid.
+     * 
+     * The grid is filled diagonally:
+     *    1  3  6 10 15 ...
+     *    2  5  9 14 ...
+     *    4  8 13 ...
+     *    7 12 ...
+     *   11 ...
+     * 
+     * Code generation: start with 20151125, then code = (prev * 252533) % 33554393
+     */
+
+    const FIRST_CODE = 20151125;
+    const MULTIPLIER = 252533;
+    const MODULO = 33554393;
+
+    /**
+     * Parses the input to extract the target row and column.
+     */
+    function parseInput(input) {
+        // "To continue, please consult the code grid in the manual.  
+        //  Enter the code at row 2947, column 3029."
+        const match = input.match(/row\s+(\d+).*column\s+(\d+)/);
+        if (!match) {
+            throw new Error('Could not find row and column in input');
+        }
+        return {
+            row: parseInt(match[1], 10),
+            col: parseInt(match[2], 10)
+        };
+    }
+
+    /**
+     * Converts (row, col) to the sequence number (1-indexed).
+     * 
+     * The sequence fills diagonals. Position (row, col) is on diagonal (row + col - 1).
+     * The diagonal d starts at position: 1 + 2 + 3 + ... + (d-1) + 1 = d*(d-1)/2 + 1
+     * Within diagonal d, we go from (d, 1) to (1, d), so position (row, col) is
+     * the col-th element on that diagonal.
+     * 
+     * @param {number} row - 1-indexed row
+     * @param {number} col - 1-indexed column
+     * @returns {number} The sequence number
+     */
+    function getSequenceNumber(row, col) {
+        // Which diagonal? Diagonal d contains positions where row + col - 1 = d
+        const diagonal = row + col - 1;
+        
+        // First position on diagonal d is: 1 + 2 + ... + (d-1) + 1 = d*(d-1)/2 + 1
+        const diagonalStart = (diagonal * (diagonal - 1)) / 2 + 1;
+        
+        // Within the diagonal, col tells us the offset (0-indexed: col - 1)
+        return diagonalStart + (col - 1);
+    }
+
+    /**
+     * Generates the code at the given sequence number.
+     * Uses modular exponentiation for efficiency if needed, but
+     * simple iteration is fast enough for reasonable inputs.
+     * 
+     * @param {number} n - The sequence number (1-indexed)
+     * @returns {number} The code
+     */
+    function getCode(n) {
+        let code = FIRST_CODE;
+        
+        for (let i = 1; i < n; i++) {
+            code = (code * MULTIPLIER) % MODULO;
+        }
+        
+        return code;
+    }
+
+    /**
+     * Solves the puzzle.
+     */
+    function solve(input) {
+        const { row, col } = parseInput(input);
+        const seqNum = getSequenceNumber(row, col);
+        const code = getCode(seqNum);
+        
+        return {
+            part1: code,
+            row,
+            col,
+            sequenceNumber: seqNum
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Code at row ' + result.row + ', column ' + result.col + '</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Sequence number ' + result.sequenceNumber.toLocaleString() + 
+                    ', computed in ' + ((endTime - startTime) / 1000).toFixed(2) + 's';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

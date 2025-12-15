@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 23: Opening the Turing Lock</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 23</h1>
+    <h2>Opening the Turing Lock</h2>
+    
+    <p class="instructions">Select your puzzle input file to run the program.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 23: Opening the Turing Lock
+     * 
+     * Part 1: Execute program with a=0, b=0. Return b.
+     * Part 2: Execute program with a=1, b=0. Return b.
+     */
+
+    /**
+     * Parses the program into an array of instruction objects.
+     */
+    function parseProgram(input) {
+        const lines = input.trim().split('\n');
+        const program = [];
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            
+            let match;
+            
+            // hlf r, tpl r, inc r
+            match = trimmed.match(/^(hlf|tpl|inc) ([ab])$/);
+            if (match) {
+                program.push({ op: match[1], reg: match[2], offset: null });
+                continue;
+            }
+            
+            // jmp offset
+            match = trimmed.match(/^jmp ([+-]\d+)$/);
+            if (match) {
+                program.push({ op: 'jmp', reg: null, offset: parseInt(match[1], 10) });
+                continue;
+            }
+            
+            // jie r, offset / jio r, offset
+            match = trimmed.match(/^(jie|jio) ([ab]), ([+-]\d+)$/);
+            if (match) {
+                program.push({ op: match[1], reg: match[2], offset: parseInt(match[3], 10) });
+                continue;
+            }
+        }
+        
+        return program;
+    }
+
+    /**
+     * Executes the program and returns the final register values.
+     */
+    function execute(program, initialA = 0, initialB = 0) {
+        const registers = { a: initialA, b: initialB };
+        let pc = 0;
+        let instructionsExecuted = 0;
+        
+        while (pc >= 0 && pc < program.length) {
+            const instr = program[pc];
+            instructionsExecuted++;
+            
+            switch (instr.op) {
+                case 'hlf':
+                    registers[instr.reg] = Math.floor(registers[instr.reg] / 2);
+                    pc++;
+                    break;
+                    
+                case 'tpl':
+                    registers[instr.reg] = registers[instr.reg] * 3;
+                    pc++;
+                    break;
+                    
+                case 'inc':
+                    registers[instr.reg]++;
+                    pc++;
+                    break;
+                    
+                case 'jmp':
+                    pc += instr.offset;
+                    break;
+                    
+                case 'jie':
+                    if (registers[instr.reg] % 2 === 0) {
+                        pc += instr.offset;
+                    } else {
+                        pc++;
+                    }
+                    break;
+                    
+                case 'jio':
+                    if (registers[instr.reg] === 1) {
+                        pc += instr.offset;
+                    } else {
+                        pc++;
+                    }
+                    break;
+                    
+                default:
+                    pc++;
+            }
+        }
+        
+        return {
+            a: registers.a,
+            b: registers.b,
+            instructionsExecuted
+        };
+    }
+
+    /**
+     * Solves the puzzle.
+     */
+    function solve(input) {
+        const program = parseProgram(input);
+        
+        // Part 1: a=0, b=0
+        const result1 = execute(program, 0, 0);
+        
+        // Part 2: a=1, b=0
+        const result2 = execute(program, 1, 0);
+        
+        return {
+            part1: result1.b,
+            part2: result2.b,
+            instructionCount: program.length,
+            instructionsExecuted1: result1.instructionsExecuted,
+            instructionsExecuted2: result2.instructionsExecuted
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Register b (a starts at 0)</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Register b (a starts at 1)</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: ' + result.instructionCount + ' instructions. ' +
+                    'Part 1: ' + result.instructionsExecuted1.toLocaleString() + ' executed, ' +
+                    'Part 2: ' + result.instructionsExecuted2.toLocaleString() + ' executed. ' +
+                    'Completed in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

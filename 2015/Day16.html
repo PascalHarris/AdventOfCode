@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 16: Aunt Sue</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 16</h1>
+    <h2>Aunt Sue</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the right Aunt Sue.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 16: Aunt Sue
+     * 
+     * Part 1: Find the Sue whose attributes exactly match MFCSAM readings.
+     * Part 2: Some attributes use range comparisons:
+     *         - cats, trees: Sue's value must be GREATER than reading
+     *         - pomeranians, goldfish: Sue's value must be LESS than reading
+     *         - Others: exact match
+     */
+
+    // The MFCSAM readings from the gift wrapping
+    const MFCSAM_READINGS = {
+        children: 3,
+        cats: 7,
+        samoyeds: 2,
+        pomeranians: 3,
+        akitas: 0,
+        vizslas: 0,
+        goldfish: 5,
+        trees: 3,
+        cars: 2,
+        perfumes: 1
+    };
+
+    // Attributes that use "greater than" comparison in Part 2
+    const GREATER_THAN_ATTRS = new Set(['cats', 'trees']);
+
+    // Attributes that use "less than" comparison in Part 2
+    const LESS_THAN_ATTRS = new Set(['pomeranians', 'goldfish']);
+
+    /**
+     * Parses the input into Aunt Sue data.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Array} Array of Sue objects with number and attributes
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const sues = [];
+        
+        for (const line of lines) {
+            const match = line.match(/^Sue (\d+): (.+)$/);
+            if (!match) continue;
+            
+            const number = parseInt(match[1], 10);
+            const attributeStr = match[2];
+            const attributes = {};
+            
+            const attrPairs = attributeStr.split(', ');
+            for (const pair of attrPairs) {
+                const [name, value] = pair.split(': ');
+                attributes[name] = parseInt(value, 10);
+            }
+            
+            sues.push({ number, attributes });
+        }
+        
+        return sues;
+    }
+
+    /**
+     * Checks if a Sue matches the MFCSAM readings (Part 1 - exact match).
+     * 
+     * @param {Object} sue - The Sue object
+     * @param {Object} readings - The MFCSAM readings
+     * @returns {boolean} True if this Sue could be the one
+     */
+    function matchesPart1(sue, readings) {
+        for (const [attr, value] of Object.entries(sue.attributes)) {
+            if (readings[attr] !== undefined && readings[attr] !== value) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Checks if a Sue matches the MFCSAM readings (Part 2 - with ranges).
+     * 
+     * @param {Object} sue - The Sue object
+     * @param {Object} readings - The MFCSAM readings
+     * @returns {boolean} True if this Sue could be the one
+     */
+    function matchesPart2(sue, readings) {
+        for (const [attr, value] of Object.entries(sue.attributes)) {
+            if (readings[attr] === undefined) continue;
+            
+            if (GREATER_THAN_ATTRS.has(attr)) {
+                // Sue's value must be greater than the reading
+                if (value <= readings[attr]) {
+                    return false;
+                }
+            } else if (LESS_THAN_ATTRS.has(attr)) {
+                // Sue's value must be less than the reading
+                if (value >= readings[attr]) {
+                    return false;
+                }
+            } else {
+                // Exact match required
+                if (value !== readings[attr]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const sues = parseInput(input);
+        
+        let part1Sue = null;
+        let part2Sue = null;
+        
+        for (const sue of sues) {
+            if (part1Sue === null && matchesPart1(sue, MFCSAM_READINGS)) {
+                part1Sue = sue.number;
+            }
+            if (part2Sue === null && matchesPart2(sue, MFCSAM_READINGS)) {
+                part2Sue = sue.number;
+            }
+            if (part1Sue !== null && part2Sue !== null) {
+                break;
+            }
+        }
+        
+        return {
+            part1: part1Sue,
+            part2: part2Sue,
+            sueCount: sues.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Sue (exact match)</div>' +
+                        '<span class="answer">Sue ' + result.part1 + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Sue (with ranges)</div>' +
+                        '<span class="answer">Sue ' + result.part2 + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Searched ' + result.sueCount + 
+                    ' Aunt Sues in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

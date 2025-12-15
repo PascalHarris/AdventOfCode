@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 18: Like a GIF For Your Yard</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 18</h1>
+    <h2>Like a GIF For Your Yard</h2>
+    
+    <p class="instructions">Select your puzzle input file to animate the lights.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 18: Like a GIF For Your Yard
+     * 
+     * Part 1: Simulate 100 steps of Conway's Game of Life.
+     * Part 2: Same, but four corner lights are stuck ON.
+     */
+
+    const STEPS = 100;
+
+    /**
+     * Parses the input into a grid.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Array} 2D array of booleans (true = on)
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        return lines.map(line => 
+            line.trim().split('').map(c => c === '#')
+        );
+    }
+
+    /**
+     * Deep copies a grid.
+     * 
+     * @param {Array} grid - The grid to copy
+     * @returns {Array} A deep copy
+     */
+    function copyGrid(grid) {
+        return grid.map(row => [...row]);
+    }
+
+    /**
+     * Sets the four corners to ON.
+     * 
+     * @param {Array} grid - The grid to modify
+     */
+    function setCornersOn(grid) {
+        const rows = grid.length;
+        const cols = grid[0].length;
+        grid[0][0] = true;
+        grid[0][cols - 1] = true;
+        grid[rows - 1][0] = true;
+        grid[rows - 1][cols - 1] = true;
+    }
+
+    /**
+     * Counts the number of ON neighbors for a cell.
+     * 
+     * @param {Array} grid - The current grid
+     * @param {number} row - Row index
+     * @param {number} col - Column index
+     * @returns {number} Count of ON neighbors
+     */
+    function countNeighbors(grid, row, col) {
+        const rows = grid.length;
+        const cols = grid[0].length;
+        let count = 0;
+        
+        for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                
+                const nr = row + dr;
+                const nc = col + dc;
+                
+                if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                    if (grid[nr][nc]) count++;
+                }
+            }
+        }
+        
+        return count;
+    }
+
+    /**
+     * Performs one step of the simulation.
+     * 
+     * @param {Array} grid - The current grid
+     * @param {boolean} cornersStuck - If true, corners stay ON
+     * @returns {Array} The new grid after one step
+     */
+    function step(grid, cornersStuck = false) {
+        const rows = grid.length;
+        const cols = grid[0].length;
+        const newGrid = [];
+        
+        for (let r = 0; r < rows; r++) {
+            const newRow = [];
+            for (let c = 0; c < cols; c++) {
+                const neighbors = countNeighbors(grid, r, c);
+                const isOn = grid[r][c];
+                
+                if (isOn) {
+                    newRow.push(neighbors === 2 || neighbors === 3);
+                } else {
+                    newRow.push(neighbors === 3);
+                }
+            }
+            newGrid.push(newRow);
+        }
+        
+        // If corners are stuck, force them ON after each step
+        if (cornersStuck) {
+            setCornersOn(newGrid);
+        }
+        
+        return newGrid;
+    }
+
+    /**
+     * Counts the number of lights that are ON.
+     * 
+     * @param {Array} grid - The grid
+     * @returns {number} Count of ON lights
+     */
+    function countOn(grid) {
+        let count = 0;
+        for (const row of grid) {
+            for (const cell of row) {
+                if (cell) count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const initialGrid = parseInput(input);
+        const gridSize = initialGrid.length;
+        
+        // Part 1: Normal Game of Life
+        let grid1 = copyGrid(initialGrid);
+        for (let i = 0; i < STEPS; i++) {
+            grid1 = step(grid1, false);
+        }
+        
+        // Part 2: Corners stuck ON
+        let grid2 = copyGrid(initialGrid);
+        setCornersOn(grid2);  // Corners start ON too
+        for (let i = 0; i < STEPS; i++) {
+            grid2 = step(grid2, true);
+        }
+        
+        return {
+            part1: countOn(grid1),
+            part2: countOn(grid2),
+            gridSize: gridSize
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Lights ON after ' + STEPS + ' steps</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Lights ON (corners stuck)</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Simulated ' + STEPS + ' steps (×2) on a ' + 
+                    result.gridSize + '×' + result.gridSize + ' grid in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

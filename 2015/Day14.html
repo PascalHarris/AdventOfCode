@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 14: Reindeer Olympics</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 14</h1>
+    <h2>Reindeer Olympics</h2>
+    
+    <p class="instructions">Select your puzzle input file to simulate the reindeer race.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 14: Reindeer Olympics
+     * 
+     * Part 1: After 2503 seconds, what distance has the winning reindeer traveled?
+     * Part 2: Using points (1 point per second to leader(s)), what's the winning score?
+     */
+
+    const RACE_DURATION = 2503;
+
+    /**
+     * Parses the input into reindeer data.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Array} Array of reindeer objects
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const reindeer = [];
+        
+        for (const line of lines) {
+            const match = line.match(/^(\w+) can fly (\d+) km\/s for (\d+) seconds, but then must rest for (\d+) seconds\.$/);
+            if (!match) continue;
+            
+            const [, name, speed, flyTime, restTime] = match;
+            reindeer.push({
+                name: name,
+                speed: parseInt(speed, 10),
+                flyTime: parseInt(flyTime, 10),
+                restTime: parseInt(restTime, 10)
+            });
+        }
+        
+        return reindeer;
+    }
+
+    /**
+     * Calculates the distance a reindeer has traveled after a given time.
+     * 
+     * @param {Object} reindeer - The reindeer object
+     * @param {number} time - Time in seconds
+     * @returns {number} Distance traveled in km
+     */
+    function calculateDistance(reindeer, time) {
+        const cycleTime = reindeer.flyTime + reindeer.restTime;
+        const completeCycles = Math.floor(time / cycleTime);
+        const remainingTime = time % cycleTime;
+        
+        let distance = completeCycles * reindeer.speed * reindeer.flyTime;
+        const flyingTimeInPartialCycle = Math.min(remainingTime, reindeer.flyTime);
+        distance += flyingTimeInPartialCycle * reindeer.speed;
+        
+        return distance;
+    }
+
+    /**
+     * Simulates the race with the new points system.
+     * At the end of each second, the leader(s) get 1 point.
+     * 
+     * @param {Array} reindeer - Array of reindeer objects
+     * @param {number} duration - Race duration in seconds
+     * @returns {Object} Map of reindeer names to points
+     */
+    function simulatePointsRace(reindeer, duration) {
+        const points = {};
+        for (const r of reindeer) {
+            points[r.name] = 0;
+        }
+        
+        // Simulate each second
+        for (let t = 1; t <= duration; t++) {
+            // Calculate distances at this second
+            let maxDistance = 0;
+            const distances = [];
+            
+            for (const r of reindeer) {
+                const dist = calculateDistance(r, t);
+                distances.push({ name: r.name, distance: dist });
+                if (dist > maxDistance) {
+                    maxDistance = dist;
+                }
+            }
+            
+            // Award points to all leaders (handles ties)
+            for (const d of distances) {
+                if (d.distance === maxDistance) {
+                    points[d.name]++;
+                }
+            }
+        }
+        
+        return points;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const reindeer = parseInput(input);
+        
+        // Part 1: Find the winning distance after 2503 seconds
+        let maxDistance = 0;
+        let distanceWinner = null;
+        
+        for (const r of reindeer) {
+            const distance = calculateDistance(r, RACE_DURATION);
+            if (distance > maxDistance) {
+                maxDistance = distance;
+                distanceWinner = r.name;
+            }
+        }
+        
+        // Part 2: Simulate points-based race
+        const points = simulatePointsRace(reindeer, RACE_DURATION);
+        
+        let maxPoints = 0;
+        let pointsWinner = null;
+        for (const name of Object.keys(points)) {
+            if (points[name] > maxPoints) {
+                maxPoints = points[name];
+                pointsWinner = name;
+            }
+        }
+        
+        return {
+            part1: maxDistance,
+            part2: maxPoints,
+            distanceWinner: distanceWinner,
+            pointsWinner: pointsWinner,
+            reindeerCount: reindeer.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Winning distance</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span> km (' + result.distanceWinner + ')' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Winning points</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span> points (' + result.pointsWinner + ')' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Simulated ' + result.reindeerCount + 
+                    ' reindeer over ' + RACE_DURATION + ' seconds in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

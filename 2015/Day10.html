@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 10: Elves Look, Elves Say</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .input-section {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            width: 200px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00cc00;
+        }
+        button {
+            background: #10101a;
+            color: #00cc00;
+            padding: 10px 20px;
+            border: 1px solid #00cc00;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #00cc00;
+            color: #0f0f23;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+        .progress {
+            color: #009900;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 10</h1>
+    <h2>Elves Look, Elves Say</h2>
+    
+    <p class="instructions">Enter your puzzle input to generate the look-and-say sequence.</p>
+    
+    <div class="input-section">
+        <input type="text" id="puzzleInput" value="3113322113" placeholder="Enter sequence">
+        <button id="runBtn" onclick="runSolution()">Run</button>
+    </div>
+    
+    <div id="progress" class="progress"></div>
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 10: Elves Look, Elves Say
+     * 
+     * Part 1: Apply the look-and-say process 40 times, find result length.
+     * Part 2: Apply the look-and-say process 50 times, find result length.
+     * 
+     * Approach: For each iteration, scan the string and group consecutive
+     * identical digits, then build the new string from counts and digits.
+     * 
+     * Performance: Use array joining instead of string concatenation.
+     */
+
+    /**
+     * Applies one iteration of the look-and-say process.
+     * 
+     * @param {string} sequence - The current sequence
+     * @returns {string} The next sequence
+     */
+    function lookAndSay(sequence) {
+        const result = [];
+        let i = 0;
+        
+        while (i < sequence.length) {
+            const digit = sequence[i];
+            let count = 1;
+            
+            // Count consecutive identical digits
+            while (i + count < sequence.length && sequence[i + count] === digit) {
+                count++;
+            }
+            
+            // Append count and digit
+            result.push(count.toString(), digit);
+            
+            // Move past this run
+            i += count;
+        }
+        
+        return result.join('');
+    }
+
+    let running = false;
+
+    /**
+     * Runs the solution with progress updates.
+     */
+    function runSolution() {
+        const input = document.getElementById('puzzleInput').value.trim();
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+        const progressEl = document.getElementById('progress');
+        const runBtn = document.getElementById('runBtn');
+
+        if (!input || !/^\d+$/.test(input)) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Please enter a valid sequence of digits.</span>';
+            return;
+        }
+
+        if (running) return;
+        running = true;
+        runBtn.disabled = true;
+        resultEl.style.display = 'none';
+        statsEl.innerHTML = '';
+
+        const startTime = performance.now();
+
+        // Run iterations in batches to allow UI updates
+        let sequence = input;
+        let iteration = 0;
+        let part1Length = 0;
+        const totalIterations = 50;
+
+        function runBatch() {
+            const batchEnd = Math.min(iteration + 2, totalIterations);
+            
+            while (iteration < batchEnd) {
+                sequence = lookAndSay(sequence);
+                iteration++;
+                
+                // Capture Part 1 result at iteration 40
+                if (iteration === 40) {
+                    part1Length = sequence.length;
+                }
+            }
+
+            progressEl.innerHTML = '🔢 Processing... iteration ' + iteration + '/' + totalIterations + 
+                ' (length: ' + sequence.length.toLocaleString() + ')';
+
+            if (iteration < totalIterations) {
+                setTimeout(runBatch, 0);
+            } else {
+                // Done
+                finishSolution(part1Length, sequence.length);
+            }
+        }
+
+        function finishSolution(p1Length, p2Length) {
+            const endTime = performance.now();
+            running = false;
+            runBtn.disabled = false;
+            progressEl.innerHTML = '';
+
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = 
+                '<div class="part">' +
+                    '<div class="part-label"><span class="star">★</span> Part 1: Length after 40 iterations</div>' +
+                    '<span class="answer">' + p1Length.toLocaleString() + '</span>' +
+                '</div>' +
+                '<div class="part">' +
+                    '<div class="part-label"><span class="star">★</span> Part 2: Length after 50 iterations</div>' +
+                    '<span class="answer">' + p2Length.toLocaleString() + '</span>' +
+                '</div>';
+
+            statsEl.innerHTML = '📊 Stats: Completed 50 iterations in ' + 
+                ((endTime - startTime) / 1000).toFixed(2) + 's';
+        }
+
+        runBatch();
+    }
+
+    // Allow Enter key to run
+    document.getElementById('puzzleInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') runSolution();
+    });
+    </script>
+</body>
+</html>

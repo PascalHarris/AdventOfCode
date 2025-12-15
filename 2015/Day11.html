@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 11: Corporate Policy</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .input-section {
+            margin: 20px 0;
+        }
+        input[type="text"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            width: 200px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #00cc00;
+        }
+        button {
+            background: #10101a;
+            color: #00cc00;
+            padding: 10px 20px;
+            border: 1px solid #00cc00;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #00cc00;
+            color: #0f0f23;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+        .progress {
+            color: #009900;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 11</h1>
+    <h2>Corporate Policy</h2>
+    
+    <p class="instructions">Enter Santa's current password to find the next valid one.</p>
+    
+    <div class="input-section">
+        <input type="text" id="puzzleInput" value="hxbxwxba" placeholder="Enter password">
+        <button id="runBtn" onclick="runSolution()">Find Next</button>
+    </div>
+    
+    <div id="progress" class="progress"></div>
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 11: Corporate Policy
+     * 
+     * Part 1: Find the next valid password after the given one.
+     * 
+     * Rules:
+     * 1. Must contain an increasing straight of 3 letters (abc, bcd, etc.)
+     * 2. Must not contain i, o, or l
+     * 3. Must contain at least two different non-overlapping pairs (aa, bb, etc.)
+     */
+
+    /**
+     * Increments a password string like counting.
+     * 'aa' -> 'ab', 'az' -> 'ba', 'zz' -> 'aaa'
+     * 
+     * @param {string} password - The current password
+     * @returns {string} The incremented password
+     */
+    function increment(password) {
+        const chars = password.split('');
+        let i = chars.length - 1;
+        
+        while (i >= 0) {
+            if (chars[i] === 'z') {
+                chars[i] = 'a';
+                i--;
+            } else {
+                chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+                break;
+            }
+        }
+        
+        return chars.join('');
+    }
+
+    /**
+     * Smart increment that skips invalid characters (i, o, l).
+     * If we hit an invalid char, increment it and set all following chars to 'a'.
+     * This skips large ranges of invalid passwords at once.
+     * 
+     * @param {string} password - The current password
+     * @returns {string} The next password (may still need validation)
+     */
+    function smartIncrement(password) {
+        password = increment(password);
+        const chars = password.split('');
+        
+        // Check for forbidden characters and skip ahead
+        for (let i = 0; i < chars.length; i++) {
+            if (chars[i] === 'i' || chars[i] === 'o' || chars[i] === 'l') {
+                // Increment this char and set all following to 'a'
+                chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+                for (let j = i + 1; j < chars.length; j++) {
+                    chars[j] = 'a';
+                }
+                break;
+            }
+        }
+        
+        return chars.join('');
+    }
+
+    /**
+     * Checks if password contains an increasing straight of 3 letters.
+     * 
+     * @param {string} password - The password to check
+     * @returns {boolean} True if it has a straight
+     */
+    function hasStraight(password) {
+        for (let i = 0; i < password.length - 2; i++) {
+            const c1 = password.charCodeAt(i);
+            const c2 = password.charCodeAt(i + 1);
+            const c3 = password.charCodeAt(i + 2);
+            
+            if (c2 === c1 + 1 && c3 === c2 + 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if password contains forbidden characters (i, o, l).
+     * 
+     * @param {string} password - The password to check
+     * @returns {boolean} True if it has forbidden chars
+     */
+    function hasForbidden(password) {
+        return password.includes('i') || password.includes('o') || password.includes('l');
+    }
+
+    /**
+     * Checks if password contains at least two different non-overlapping pairs.
+     * 
+     * @param {string} password - The password to check
+     * @returns {boolean} True if it has two pairs
+     */
+    function hasTwoPairs(password) {
+        const pairs = new Set();
+        let i = 0;
+        
+        while (i < password.length - 1) {
+            if (password[i] === password[i + 1]) {
+                pairs.add(password[i]);
+                i += 2;  // Skip past this pair (non-overlapping)
+            } else {
+                i++;
+            }
+        }
+        
+        return pairs.size >= 2;
+    }
+
+    /**
+     * Checks if a password is valid according to all rules.
+     * 
+     * @param {string} password - The password to check
+     * @returns {boolean} True if valid
+     */
+    function isValid(password) {
+        return !hasForbidden(password) && hasStraight(password) && hasTwoPairs(password);
+    }
+
+    /**
+     * Finds the next valid password.
+     * 
+     * @param {string} password - The starting password
+     * @returns {string} The next valid password
+     */
+    function findNextPassword(password) {
+        password = smartIncrement(password);
+        
+        while (!isValid(password)) {
+            password = smartIncrement(password);
+        }
+        
+        return password;
+    }
+
+    let running = false;
+
+    /**
+     * Runs the solution.
+     */
+    function runSolution() {
+        const input = document.getElementById('puzzleInput').value.trim().toLowerCase();
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+        const progressEl = document.getElementById('progress');
+        const runBtn = document.getElementById('runBtn');
+
+        if (!input || !/^[a-z]{8}$/.test(input)) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Please enter a valid 8-letter lowercase password.</span>';
+            return;
+        }
+
+        if (running) return;
+        running = true;
+        runBtn.disabled = true;
+        resultEl.style.display = 'none';
+        progressEl.innerHTML = '🔐 Finding next password...';
+
+        const startTime = performance.now();
+
+        // Use setTimeout to allow UI to update
+        setTimeout(function() {
+            const part1 = findNextPassword(input);
+            
+            progressEl.innerHTML = '🔐 Found first, finding second...';
+            
+            setTimeout(function() {
+                const part2 = findNextPassword(part1);
+                const endTime = performance.now();
+                
+                running = false;
+                runBtn.disabled = false;
+                progressEl.innerHTML = '';
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Next password</div>' +
+                        '<span class="answer">' + part1 + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Password after that</div>' +
+                        '<span class="answer">' + part2 + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Found both passwords in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+            }, 10);
+        }, 10);
+    }
+
+    // Allow Enter key to run
+    document.getElementById('puzzleInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') runSolution();
+    });
+    </script>
+</body>
+</html>

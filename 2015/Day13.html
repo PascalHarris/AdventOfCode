@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 13: Knights of the Dinner Table</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 13</h1>
+    <h2>Knights of the Dinner Table</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the optimal seating arrangement.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 13: Knights of the Dinner Table
+     * 
+     * Part 1: Find the optimal circular seating arrangement that maximizes
+     *         total happiness.
+     * Part 2: Add yourself to the guest list with 0 happiness relationships,
+     *         then find the optimal arrangement.
+     */
+
+    /**
+     * Parses the input into a happiness map.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} { people: Array, happiness: Map }
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const people = new Set();
+        const happiness = new Map();
+        
+        for (const line of lines) {
+            const match = line.match(/^(\w+) would (gain|lose) (\d+) happiness units by sitting next to (\w+)\.$/);
+            if (!match) continue;
+            
+            const [, person1, gainLose, amount, person2] = match;
+            const value = gainLose === 'gain' ? parseInt(amount, 10) : -parseInt(amount, 10);
+            
+            people.add(person1);
+            people.add(person2);
+            
+            const key = person1 + '|' + person2;
+            happiness.set(key, value);
+        }
+        
+        return { people: Array.from(people), happiness };
+    }
+
+    /**
+     * Calculates total happiness for a seating arrangement.
+     * 
+     * @param {Array} arrangement - Array of people in seating order
+     * @param {Map} happiness - Map of person pairs to happiness values
+     * @returns {number} Total happiness
+     */
+    function calculateHappiness(arrangement, happiness) {
+        let total = 0;
+        const n = arrangement.length;
+        
+        for (let i = 0; i < n; i++) {
+            const person = arrangement[i];
+            const leftNeighbor = arrangement[(i - 1 + n) % n];
+            const rightNeighbor = arrangement[(i + 1) % n];
+            
+            const leftKey = person + '|' + leftNeighbor;
+            total += happiness.get(leftKey) || 0;
+            
+            const rightKey = person + '|' + rightNeighbor;
+            total += happiness.get(rightKey) || 0;
+        }
+        
+        return total;
+    }
+
+    /**
+     * Generates all permutations of an array using Heap's algorithm.
+     * 
+     * @param {Array} arr - The array to permute
+     * @returns {Array} Array of all permutations
+     */
+    function permutations(arr) {
+        const result = [];
+        const c = new Array(arr.length).fill(0);
+        
+        result.push([...arr]);
+        
+        let i = 0;
+        while (i < arr.length) {
+            if (c[i] < i) {
+                if (i % 2 === 0) {
+                    [arr[0], arr[i]] = [arr[i], arr[0]];
+                } else {
+                    [arr[c[i]], arr[i]] = [arr[i], arr[c[i]]];
+                }
+                result.push([...arr]);
+                c[i]++;
+                i = 0;
+            } else {
+                c[i] = 0;
+                i++;
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Finds the optimal seating arrangement.
+     * 
+     * @param {Array} people - Array of people
+     * @param {Map} happiness - Happiness map
+     * @returns {number} Maximum total happiness
+     */
+    function findOptimalHappiness(people, happiness) {
+        if (people.length === 0) return 0;
+        if (people.length === 1) return 0;
+        
+        // For a circular table, fix one person and permute the rest
+        const fixed = people[0];
+        const others = people.slice(1);
+        
+        let maxHappiness = -Infinity;
+        
+        for (const perm of permutations(others)) {
+            const arrangement = [fixed, ...perm];
+            const total = calculateHappiness(arrangement, happiness);
+            
+            if (total > maxHappiness) {
+                maxHappiness = total;
+            }
+        }
+        
+        return maxHappiness;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const { people, happiness } = parseInput(input);
+        
+        // Part 1: Original guest list
+        const part1 = findOptimalHappiness(people, happiness);
+        
+        // Part 2: Add yourself with 0 happiness relationships
+        // No need to add explicit 0 entries - the || 0 in calculateHappiness handles missing keys
+        const peopleWithMe = [...people, 'Me'];
+        const part2 = findOptimalHappiness(peopleWithMe, happiness);
+        
+        return {
+            part1: part1,
+            part2: part2,
+            guestCount: people.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Optimal happiness (without you)</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Optimal happiness (with you)</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Found optimal arrangements for ' + 
+                    result.guestCount + ' guests (and you!) in ' + (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

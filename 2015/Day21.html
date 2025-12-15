@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 21: RPG Simulator 20XX</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 21</h1>
+    <h2>RPG Simulator 20XX</h2>
+    
+    <p class="instructions">Select your puzzle input file (boss stats) to find optimal equipment.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 21: RPG Simulator 20XX
+     * 
+     * Part 1: Find the minimum gold to spend to win against the boss.
+     * Part 2: Find the maximum gold to spend and still lose.
+     */
+
+    const PLAYER_HP = 100;
+
+    // Shop inventory
+    const WEAPONS = [
+        { name: 'Dagger',     cost: 8,   damage: 4, armor: 0 },
+        { name: 'Shortsword', cost: 10,  damage: 5, armor: 0 },
+        { name: 'Warhammer',  cost: 25,  damage: 6, armor: 0 },
+        { name: 'Longsword',  cost: 40,  damage: 7, armor: 0 },
+        { name: 'Greataxe',   cost: 74,  damage: 8, armor: 0 }
+    ];
+
+    const ARMORS = [
+        { name: 'None',       cost: 0,   damage: 0, armor: 0 },
+        { name: 'Leather',    cost: 13,  damage: 0, armor: 1 },
+        { name: 'Chainmail',  cost: 31,  damage: 0, armor: 2 },
+        { name: 'Splintmail', cost: 53,  damage: 0, armor: 3 },
+        { name: 'Bandedmail', cost: 75,  damage: 0, armor: 4 },
+        { name: 'Platemail',  cost: 102, damage: 0, armor: 5 }
+    ];
+
+    const RINGS = [
+        { name: 'None',       cost: 0,   damage: 0, armor: 0 },
+        { name: 'Damage +1',  cost: 25,  damage: 1, armor: 0 },
+        { name: 'Damage +2',  cost: 50,  damage: 2, armor: 0 },
+        { name: 'Damage +3',  cost: 100, damage: 3, armor: 0 },
+        { name: 'Defense +1', cost: 20,  damage: 0, armor: 1 },
+        { name: 'Defense +2', cost: 40,  damage: 0, armor: 2 },
+        { name: 'Defense +3', cost: 80,  damage: 0, armor: 3 }
+    ];
+
+    /**
+     * Parses the boss stats from input.
+     */
+    function parseBoss(input) {
+        const lines = input.trim().split('\n');
+        const boss = {};
+        
+        for (const line of lines) {
+            const hpMatch = line.match(/Hit Points: (\d+)/);
+            const dmgMatch = line.match(/Damage: (\d+)/);
+            const armMatch = line.match(/Armor: (\d+)/);
+            
+            if (hpMatch) boss.hp = parseInt(hpMatch[1], 10);
+            if (dmgMatch) boss.damage = parseInt(dmgMatch[1], 10);
+            if (armMatch) boss.armor = parseInt(armMatch[1], 10);
+        }
+        
+        return boss;
+    }
+
+    /**
+     * Simulates a fight and returns true if the player wins.
+     */
+    function playerWins(playerHp, playerDamage, playerArmor, boss) {
+        const playerDeals = Math.max(1, playerDamage - boss.armor);
+        const bossDeals = Math.max(1, boss.damage - playerArmor);
+        
+        const turnsToKillBoss = Math.ceil(boss.hp / playerDeals);
+        const turnsToKillPlayer = Math.ceil(playerHp / bossDeals);
+        
+        return turnsToKillBoss <= turnsToKillPlayer;
+    }
+
+    /**
+     * Generates all valid equipment loadouts.
+     */
+    function generateLoadouts() {
+        const loadouts = [];
+        
+        for (const weapon of WEAPONS) {
+            for (const armor of ARMORS) {
+                for (let r1 = 0; r1 < RINGS.length; r1++) {
+                    for (let r2 = r1; r2 < RINGS.length; r2++) {
+                        // Can't buy two of the same ring (except "None")
+                        if (r1 === r2 && r1 !== 0) continue;
+                        
+                        const ring1 = RINGS[r1];
+                        const ring2 = RINGS[r2];
+                        
+                        const cost = weapon.cost + armor.cost + ring1.cost + ring2.cost;
+                        const damage = weapon.damage + armor.damage + ring1.damage + ring2.damage;
+                        const totalArmor = weapon.armor + armor.armor + ring1.armor + ring2.armor;
+                        
+                        loadouts.push({ cost, damage, armor: totalArmor });
+                    }
+                }
+            }
+        }
+        
+        return loadouts;
+    }
+
+    /**
+     * Solves the puzzle.
+     */
+    function solve(input) {
+        const boss = parseBoss(input);
+        const loadouts = generateLoadouts();
+        
+        let minCostToWin = Infinity;
+        let maxCostToLose = 0;
+        
+        for (const loadout of loadouts) {
+            if (playerWins(PLAYER_HP, loadout.damage, loadout.armor, boss)) {
+                minCostToWin = Math.min(minCostToWin, loadout.cost);
+            } else {
+                maxCostToLose = Math.max(maxCostToLose, loadout.cost);
+            }
+        }
+        
+        return {
+            part1: minCostToWin,
+            part2: maxCostToLose,
+            bossHp: boss.hp,
+            bossDamage: boss.damage,
+            bossArmor: boss.armor,
+            loadoutsChecked: loadouts.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Minimum gold to win</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span> gold' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Maximum gold to lose</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span> gold' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: Boss has ' + result.bossHp + ' HP, ' +
+                    result.bossDamage + ' damage, ' + result.bossArmor + ' armor. ' +
+                    'Checked ' + result.loadoutsChecked + ' loadouts in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

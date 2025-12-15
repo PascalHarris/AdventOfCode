@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 19: Medicine for Rudolph</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 19</h1>
+    <h2>Medicine for Rudolph</h2>
+    
+    <p class="instructions">Select your puzzle input file to calibrate the molecule machine.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 19: Medicine for Rudolph
+     * 
+     * Part 1: Count distinct molecules after one replacement.
+     * Part 2: Find minimum steps to go from 'e' to the medicine molecule.
+     * 
+     * Part 2 approach: Work backwards from the medicine molecule to 'e'.
+     * Use a greedy approach - always apply the replacement that reduces
+     * the string the most. This works for the AoC input due to its structure.
+     */
+
+    /**
+     * Parses the input into replacements and the medicine molecule.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} { replacements: Array, molecule: string }
+     */
+    function parseInput(input) {
+        const lines = input.trim().split('\n');
+        const replacements = [];
+        let molecule = '';
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === '') continue;
+            
+            const match = trimmed.match(/^(\w+) => (\w+)$/);
+            if (match) {
+                replacements.push({ from: match[1], to: match[2] });
+            } else {
+                molecule = trimmed;
+            }
+        }
+        
+        return { replacements, molecule };
+    }
+
+    /**
+     * Generates all distinct molecules after one replacement.
+     * 
+     * @param {string} molecule - The starting molecule
+     * @param {Array} replacements - Array of { from, to } objects
+     * @returns {Set} Set of distinct resulting molecules
+     */
+    function generateMolecules(molecule, replacements) {
+        const results = new Set();
+        
+        for (const { from, to } of replacements) {
+            let index = 0;
+            while (true) {
+                const pos = molecule.indexOf(from, index);
+                if (pos === -1) break;
+                
+                const newMolecule = molecule.slice(0, pos) + to + molecule.slice(pos + from.length);
+                results.add(newMolecule);
+                
+                index = pos + 1;
+            }
+        }
+        
+        return results;
+    }
+
+    /**
+     * Finds the minimum steps to reduce molecule to 'e' using reverse replacements.
+     * Uses a greedy approach with randomization for robustness.
+     * 
+     * @param {string} molecule - The target molecule
+     * @param {Array} replacements - Array of { from, to } objects
+     * @returns {number} Minimum number of steps
+     */
+    function findMinSteps(molecule, replacements) {
+        // Create reverse replacements (to => from)
+        const reverseReplacements = replacements.map(r => ({
+            from: r.to,
+            to: r.from
+        }));
+        
+        // Sort by length of 'from' (descending) to try longer matches first
+        reverseReplacements.sort((a, b) => b.from.length - a.from.length);
+        
+        let current = molecule;
+        let steps = 0;
+        
+        // Greedy reduction with retry on failure
+        const maxAttempts = 100;
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            current = molecule;
+            steps = 0;
+            
+            // Shuffle replacements for this attempt (after first try)
+            if (attempt > 0) {
+                shuffleArray(reverseReplacements);
+            }
+            
+            while (current !== 'e') {
+                let madeProgress = false;
+                
+                for (const { from, to } of reverseReplacements) {
+                    const pos = current.indexOf(from);
+                    if (pos !== -1) {
+                        current = current.slice(0, pos) + to + current.slice(pos + from.length);
+                        steps++;
+                        madeProgress = true;
+                        break;  // Restart from beginning of replacements
+                    }
+                }
+                
+                if (!madeProgress) {
+                    // Stuck - try again with different order
+                    break;
+                }
+            }
+            
+            if (current === 'e') {
+                return steps;
+            }
+        }
+        
+        // Fallback: Use the formula based on the structure of AoC inputs
+        // The molecule follows a specific grammar where:
+        // steps = #elements - #Rn - #Ar - 2*#Y - 1
+        // This works because Rn/Ar act like parentheses and Y is a separator
+        return calculateStepsFormula(molecule);
+    }
+
+    /**
+     * Shuffles an array in place.
+     */
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+    }
+
+    /**
+     * Calculates steps using the formula derived from the grammar structure.
+     * The AoC input has a specific structure where molecules follow a pattern.
+     * 
+     * @param {string} molecule - The molecule string
+     * @returns {number} Number of steps
+     */
+    function calculateStepsFormula(molecule) {
+        // Count elements (uppercase letter optionally followed by lowercase)
+        const elements = molecule.match(/[A-Z][a-z]?/g) || [];
+        const numElements = elements.length;
+        
+        // Count special elements
+        const numRn = (molecule.match(/Rn/g) || []).length;
+        const numAr = (molecule.match(/Ar/g) || []).length;
+        const numY = (molecule.match(/Y/g) || []).length;
+        
+        // Formula: elements - Rn - Ar - 2*Y - 1
+        // This comes from analyzing the grammar structure of the input
+        return numElements - numRn - numAr - 2 * numY - 1;
+    }
+
+    /**
+     * Solves the puzzle.
+     * 
+     * @param {string} input - The puzzle input
+     * @returns {Object} Results for both parts
+     */
+    function solve(input) {
+        const { replacements, molecule } = parseInput(input);
+        
+        // Part 1
+        const distinctMolecules = generateMolecules(molecule, replacements);
+        
+        // Part 2
+        const minSteps = findMinSteps(molecule, replacements);
+        
+        return {
+            part1: distinctMolecules.size,
+            part2: minSteps,
+            replacementCount: replacements.length,
+            moleculeLength: molecule.length
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                const startTime = performance.now();
+                const result = solve(input);
+                const endTime = performance.now();
+
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = 
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 1: Distinct molecules after one replacement</div>' +
+                        '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                    '</div>' +
+                    '<div class="part">' +
+                        '<div class="part-label"><span class="star">★</span> Part 2: Fewest steps from e to medicine</div>' +
+                        '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                    '</div>';
+
+                statsEl.innerHTML = '📊 Stats: ' + result.replacementCount + ' replacements, ' +
+                    'molecule length ' + result.moleculeLength + ', computed in ' + 
+                    (endTime - startTime).toFixed(3) + 'ms';
+
+            } catch (error) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

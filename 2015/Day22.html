@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 22: Wizard Simulator 20XX</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+        .progress {
+            color: #009900;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 22</h1>
+    <h2>Wizard Simulator 20XX</h2>
+    
+    <p class="instructions">Select your puzzle input file (boss stats) to find optimal spell sequence.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="progress" class="progress"></div>
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 22: Wizard Simulator 20XX
+     * 
+     * Part 1: Find minimum mana to spend to defeat the boss.
+     * Part 2: Hard mode - lose 1 HP at start of each player turn.
+     */
+
+    const PLAYER_HP = 50;
+    const PLAYER_MANA = 500;
+
+    // Spell definitions
+    const SPELLS = {
+        MISSILE:  { name: 'Magic Missile', cost: 53,  damage: 4, heal: 0, effect: null },
+        DRAIN:    { name: 'Drain',         cost: 73,  damage: 2, heal: 2, effect: null },
+        SHIELD:   { name: 'Shield',        cost: 113, damage: 0, heal: 0, effect: { name: 'shield', duration: 6, armor: 7 } },
+        POISON:   { name: 'Poison',        cost: 173, damage: 0, heal: 0, effect: { name: 'poison', duration: 6, dps: 3 } },
+        RECHARGE: { name: 'Recharge',      cost: 229, damage: 0, heal: 0, effect: { name: 'recharge', duration: 5, mps: 101 } }
+    };
+
+    const SPELL_LIST = [SPELLS.MISSILE, SPELLS.DRAIN, SPELLS.SHIELD, SPELLS.POISON, SPELLS.RECHARGE];
+
+    /**
+     * Parses the boss stats from input.
+     */
+    function parseBoss(input) {
+        const lines = input.trim().split('\n');
+        const boss = {};
+        
+        for (const line of lines) {
+            const hpMatch = line.match(/Hit Points: (\d+)/);
+            const dmgMatch = line.match(/Damage: (\d+)/);
+            
+            if (hpMatch) boss.hp = parseInt(hpMatch[1], 10);
+            if (dmgMatch) boss.damage = parseInt(dmgMatch[1], 10);
+        }
+        
+        return boss;
+    }
+
+    /**
+     * Creates a game state object.
+     */
+    function createState(playerHp, playerMana, bossHp, bossDamage) {
+        return {
+            playerHp,
+            playerMana,
+            bossHp,
+            bossDamage,
+            shieldTimer: 0,
+            poisonTimer: 0,
+            rechargeTimer: 0,
+            manaSpent: 0
+        };
+    }
+
+    /**
+     * Clones a game state.
+     */
+    function cloneState(state) {
+        return { ...state };
+    }
+
+    /**
+     * Applies effects at the start of a turn.
+     * Returns the player's armor value.
+     */
+    function applyEffects(state) {
+        let armor = 0;
+        
+        // Shield effect
+        if (state.shieldTimer > 0) {
+            armor = 7;
+            state.shieldTimer--;
+        }
+        
+        // Poison effect
+        if (state.poisonTimer > 0) {
+            state.bossHp -= 3;
+            state.poisonTimer--;
+        }
+        
+        // Recharge effect
+        if (state.rechargeTimer > 0) {
+            state.playerMana += 101;
+            state.rechargeTimer--;
+        }
+        
+        return armor;
+    }
+
+    /**
+     * Checks if a spell can be cast.
+     */
+    function canCast(state, spell) {
+        if (state.playerMana < spell.cost) return false;
+        
+        // Can't cast effect spells if effect is still active
+        if (spell.effect) {
+            if (spell.effect.name === 'shield' && state.shieldTimer > 0) return false;
+            if (spell.effect.name === 'poison' && state.poisonTimer > 0) return false;
+            if (spell.effect.name === 'recharge' && state.rechargeTimer > 0) return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Casts a spell, modifying the state.
+     */
+    function castSpell(state, spell) {
+        state.playerMana -= spell.cost;
+        state.manaSpent += spell.cost;
+        
+        // Instant effects
+        state.bossHp -= spell.damage;
+        state.playerHp += spell.heal;
+        
+        // Start duration effects
+        if (spell.effect) {
+            if (spell.effect.name === 'shield') state.shieldTimer = spell.effect.duration;
+            if (spell.effect.name === 'poison') state.poisonTimer = spell.effect.duration;
+            if (spell.effect.name === 'recharge') state.rechargeTimer = spell.effect.duration;
+        }
+    }
+
+    /**
+     * Finds minimum mana to win using DFS with pruning.
+     */
+    function findMinMana(bossHp, bossDamage, hardMode = false) {
+        let minMana = Infinity;
+        let statesExplored = 0;
+        
+        function search(state, isPlayerTurn) {
+            statesExplored++;
+            
+            // Pruning: if we've already spent more than best solution, stop
+            if (state.manaSpent >= minMana) return;
+            
+            // Hard mode: player loses 1 HP at start of their turn (before effects)
+            if (hardMode && isPlayerTurn) {
+                state.playerHp--;
+                if (state.playerHp <= 0) return;  // Player dies
+            }
+            
+            // Apply effects at start of every turn
+            const armor = applyEffects(state);
+            
+            // Check if boss died from effects
+            if (state.bossHp <= 0) {
+                minMana = Math.min(minMana, state.manaSpent);
+                return;
+            }
+            
+            if (isPlayerTurn) {
+                // Player's turn: try each spell
+                for (const spell of SPELL_LIST) {
+                    if (canCast(state, spell)) {
+                        const newState = cloneState(state);
+                        castSpell(newState, spell);
+                        
+                        // Check if boss died from spell
+                        if (newState.bossHp <= 0) {
+                            minMana = Math.min(minMana, newState.manaSpent);
+                            continue;
+                        }
+                        
+                        // Continue to boss turn
+                        search(newState, false);
+                    }
+                }
+                
+                // If can't cast any spell, player loses (just return)
+            } else {
+                // Boss's turn: attack
+                const damage = Math.max(1, state.bossDamage - armor);
+                state.playerHp -= damage;
+                
+                // Check if player died
+                if (state.playerHp <= 0) return;
+                
+                // Continue to player turn
+                search(state, true);
+            }
+        }
+        
+        const initialState = createState(PLAYER_HP, PLAYER_MANA, bossHp, bossDamage);
+        search(initialState, true);
+        
+        return { minMana, statesExplored };
+    }
+
+    /**
+     * Solves the puzzle.
+     */
+    function solve(input) {
+        const boss = parseBoss(input);
+        
+        const result1 = findMinMana(boss.hp, boss.damage, false);
+        const result2 = findMinMana(boss.hp, boss.damage, true);
+        
+        return {
+            part1: result1.minMana,
+            part2: result2.minMana,
+            bossHp: boss.hp,
+            bossDamage: boss.damage,
+            statesExplored: result1.statesExplored + result2.statesExplored
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+        const progressEl = document.getElementById('progress');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                progressEl.innerHTML = '🧙 Searching for optimal spell sequences...';
+
+                setTimeout(function() {
+                    const startTime = performance.now();
+                    const result = solve(input);
+                    const endTime = performance.now();
+
+                    progressEl.innerHTML = '';
+                    resultEl.style.display = 'block';
+                    resultEl.innerHTML = 
+                        '<div class="part">' +
+                            '<div class="part-label"><span class="star">★</span> Part 1: Minimum mana (normal)</div>' +
+                            '<span class="answer">' + result.part1.toLocaleString() + '</span> mana' +
+                        '</div>' +
+                        '<div class="part">' +
+                            '<div class="part-label"><span class="star">★</span> Part 2: Minimum mana (hard mode)</div>' +
+                            '<span class="answer">' + result.part2.toLocaleString() + '</span> mana' +
+                        '</div>';
+
+                    statsEl.innerHTML = '📊 Stats: Boss has ' + result.bossHp + ' HP, ' +
+                        result.bossDamage + ' damage. ' +
+                        'Explored ' + result.statesExplored.toLocaleString() + ' states in ' + 
+                        ((endTime - startTime) / 1000).toFixed(2) + 's';
+                }, 50);
+
+            } catch (error) {
+                progressEl.innerHTML = '';
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>

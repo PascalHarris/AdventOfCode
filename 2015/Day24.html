@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advent of Code 2015 - Day 24: It Hangs in the Balance</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f0f23;
+            color: #cccccc;
+        }
+        h1 {
+            color: #00cc00;
+            text-shadow: 0 0 5px #00cc00;
+        }
+        h2 {
+            color: #009900;
+        }
+        .file-picker {
+            margin: 20px 0;
+        }
+        input[type="file"] {
+            background: #10101a;
+            color: #cccccc;
+            padding: 10px;
+            border: 1px solid #333340;
+            cursor: pointer;
+        }
+        input[type="file"]:hover {
+            border-color: #00cc00;
+        }
+        .result {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: #10101a;
+            border-left: 3px solid #00cc00;
+            display: none;
+        }
+        .part-label {
+            color: #cccccc;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .answer {
+            color: #ffff66;
+            font-weight: bold;
+        }
+        .star {
+            color: #ffff66;
+        }
+        .error {
+            color: #ff6666;
+        }
+        .stats {
+            color: #888888;
+            font-size: 0.9em;
+        }
+        .instructions {
+            color: #666666;
+            font-size: 0.9em;
+            margin-bottom: 20px;
+        }
+        .part {
+            margin: 10px 0;
+        }
+        .progress {
+            color: #009900;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎄 Advent of Code 2015 - Day 24</h1>
+    <h2>It Hangs in the Balance</h2>
+    
+    <p class="instructions">Select your puzzle input file to find the ideal package configuration.</p>
+    
+    <div class="file-picker">
+        <input type="file" id="fileInput" accept=".txt">
+    </div>
+    
+    <div id="progress" class="progress"></div>
+    <div id="result" class="result"></div>
+    <div id="stats" class="stats"></div>
+
+    <script>
+    /**
+     * Advent of Code 2015 - Day 24: It Hangs in the Balance
+     * 
+     * Part 1: Split packages into 3 equal-weight groups.
+     * Part 2: Split packages into 4 equal-weight groups.
+     * 
+     * Find the smallest first group, then minimize its quantum entanglement (product).
+     */
+
+    /**
+     * Parses the input into an array of package weights.
+     */
+    function parseInput(input) {
+        return input.trim().split('\n')
+            .map(line => parseInt(line.trim(), 10))
+            .filter(n => !isNaN(n));
+    }
+
+    /**
+     * Calculates the quantum entanglement (product) of weights.
+     */
+    function quantumEntanglement(weights) {
+        return weights.reduce((product, w) => product * w, 1);
+    }
+
+    /**
+     * Finds all subsets of exactly 'size' elements that sum to 'target'.
+     */
+    function findSubsetsOfSize(weights, target, size) {
+        const results = [];
+        
+        function search(index, remaining, count, current) {
+            if (remaining === 0 && count === size) {
+                results.push([...current]);
+                return;
+            }
+            
+            if (count === size) return;
+            if (remaining < 0) return;
+            if (index >= weights.length) return;
+            if (size - count > weights.length - index) return;
+            
+            current.push(weights[index]);
+            search(index + 1, remaining - weights[index], count + 1, current);
+            current.pop();
+            
+            search(index + 1, remaining, count, current);
+        }
+        
+        search(0, target, 0, []);
+        return results;
+    }
+
+    /**
+     * Finds the minimum QE for the smallest valid first group.
+     */
+    function findMinQE(weights, numGroups) {
+        const total = weights.reduce((sum, w) => sum + w, 0);
+        
+        if (total % numGroups !== 0) {
+            return { minQE: -1, groupSize: -1 };
+        }
+        
+        const targetWeight = total / numGroups;
+        
+        // Sort weights descending for better pruning
+        const sorted = [...weights].sort((a, b) => b - a);
+        
+        // Try increasing group sizes until we find valid configurations
+        for (let size = 1; size <= sorted.length; size++) {
+            const subsets = findSubsetsOfSize(sorted, targetWeight, size);
+            
+            if (subsets.length > 0) {
+                // Find minimum QE among all valid subsets of this size
+                let minQE = Infinity;
+                
+                for (const subset of subsets) {
+                    const qe = quantumEntanglement(subset);
+                    if (qe < minQE) {
+                        minQE = qe;
+                    }
+                }
+                
+                return { minQE, groupSize: size };
+            }
+        }
+        
+        return { minQE: -1, groupSize: -1 };
+    }
+
+    /**
+     * Solves the puzzle.
+     */
+    function solve(input) {
+        const weights = parseInput(input);
+        
+        // Part 1: 3 groups
+        const result1 = findMinQE(weights, 3);
+        
+        // Part 2: 4 groups
+        const result2 = findMinQE(weights, 4);
+        
+        return {
+            part1: result1.minQE,
+            part2: result2.minQE,
+            groupSize1: result1.groupSize,
+            groupSize2: result2.groupSize,
+            packageCount: weights.length,
+            totalWeight: weights.reduce((sum, w) => sum + w, 0)
+        };
+    }
+
+    /**
+     * Handles the file selection event.
+     */
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        const resultEl = document.getElementById('result');
+        const statsEl = document.getElementById('stats');
+        const progressEl = document.getElementById('progress');
+
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const input = e.target.result;
+                if (input.trim().length === 0) {
+                    throw new Error('Input file is empty.');
+                }
+
+                progressEl.innerHTML = '🎁 Finding optimal package configurations...';
+
+                setTimeout(function() {
+                    const startTime = performance.now();
+                    const result = solve(input);
+                    const endTime = performance.now();
+
+                    progressEl.innerHTML = '';
+                    resultEl.style.display = 'block';
+                    resultEl.innerHTML = 
+                        '<div class="part">' +
+                            '<div class="part-label"><span class="star">★</span> Part 1: QE (3 groups, ' + result.groupSize1 + ' packages)</div>' +
+                            '<span class="answer">' + result.part1.toLocaleString() + '</span>' +
+                        '</div>' +
+                        '<div class="part">' +
+                            '<div class="part-label"><span class="star">★</span> Part 2: QE (4 groups, ' + result.groupSize2 + ' packages)</div>' +
+                            '<span class="answer">' + result.part2.toLocaleString() + '</span>' +
+                        '</div>';
+
+                    statsEl.innerHTML = '📊 Stats: ' + result.packageCount + ' packages, ' +
+                        'total weight ' + result.totalWeight + '. ' +
+                        'Computed in ' + ((endTime - startTime) / 1000).toFixed(2) + 's';
+                }, 50);
+
+            } catch (error) {
+                progressEl.innerHTML = '';
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = '<span class="error">Error: ' + error.message + '</span>';
+                statsEl.innerHTML = '';
+            }
+        };
+
+        reader.onerror = function() {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span class="error">Error: Could not read the file.</span>';
+            statsEl.innerHTML = '';
+        };
+
+        reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    </script>
+</body>
+</html>
